@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 
-REQUIRED_PACKAGES = ['pytube']
+REQUIRED_PACKAGES = ['yt-dlp']
 
 for package in REQUIRED_PACKAGES:
     try:
@@ -16,25 +16,30 @@ for package in REQUIRED_PACKAGES:
     except subprocess.CalledProcessError:
         pass
 
-from pytube import YouTube
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
+import yt_dlp
 
 def download_video():
-    link = entry_link.get()
+    link = entry_link.get().strip()
+
+    if not link:
+        messagebox.showerror("Error", "Please enter a valid YouTube link.")
+        return
 
     def download():
         try:
-            yt = YouTube(link)
-            stream = yt.streams.get_highest_resolution()
-            if stream:
-                stream.download()
-                messagebox.showinfo("Download Successful", "Video downloaded successfully!")
-            else:
-                messagebox.showerror("Error", "Unable to retrieve video stream.")
+            ydl_opts = {
+                'format': 'bestvideo[height<=1080]',  # Download best video up to 1080p only
+                'outtmpl': '%(title)s.%(ext)s',        # Set output filename template
+                'progress_hooks': [hook],               # Hook for progress tracking
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([link])
+            messagebox.showinfo("Download Successful", "Video downloaded successfully!")
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            messagebox.showerror("Error", f"An error occurred: {str(e)}")
         finally:
             progress_bar.stop()
             progress_bar['value'] = 0
@@ -44,6 +49,10 @@ def download_video():
                 entry_link.delete(0, tk.END)
             else:
                 window.quit()
+
+    def hook(d):
+        if d['status'] == 'downloading':
+            progress_bar['value'] = d['downloaded_bytes'] / d['total_bytes'] * 100
 
     download_thread = threading.Thread(target=download)
     download_thread.start()
